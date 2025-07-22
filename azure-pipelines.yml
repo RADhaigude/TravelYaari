@@ -1,0 +1,67 @@
+trigger:
+  branches:
+    include:
+      - main
+
+variables:
+  azureSubscription: 'Azure-RG-Connection'  # Name of your Azure service connection
+  artifactPath: '$(System.DefaultWorkingDirectory)/**/*.zip'  # Path to your packaged artifact
+  devAppName: 'your-dev-app-service-name'
+  qaAppName: 'your-qa-app-service-name'
+  prodAppName: 'your-prod-app-service-name'
+
+stages:
+- stage: DEV
+  displayName: 'Deploy to Development'
+  jobs:
+  - deployment: DeployToDev
+    environment: 'DEV'   # This environment will be created automatically if not present
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: AzureWebApp@1
+            displayName: 'Deploy to DEV Web App'
+            inputs:
+              azureSubscription: $(azureSubscription)
+              appType: 'webApp'
+              appName: $(devAppName)
+              package: $(artifactPath)
+
+- stage: QA
+  displayName: 'Deploy to QA'
+  dependsOn: DEV
+  condition: succeeded()
+  jobs:
+  - deployment: DeployToQA
+    environment: 'QA'    # Automatically creates "QA" environment if not already created
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: AzureWebApp@1
+            displayName: 'Deploy to QA Web App'
+            inputs:
+              azureSubscription: $(azureSubscription)
+              appType: 'webApp'
+              appName: $(qaAppName)
+              package: $(artifactPath)
+
+- stage: PROD
+  displayName: 'Deploy to Production'
+  dependsOn: QA
+  condition: succeeded()
+  jobs:
+  - deployment: DeployToProd
+    environment: 'PROD'   # Automatically creates "PROD" environment if not already created
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: AzureWebApp@1
+            displayName: 'Deploy to PROD Web App'
+            inputs:
+              azureSubscription: $(azureSubscription)
+              appType: 'webApp'
+              appName: $(prodAppName)
+              package: $(artifactPath)
